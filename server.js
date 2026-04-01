@@ -10,25 +10,27 @@ const {
 
 const app = express();
 
-// ✅ IMPORTANT (Azure fix)
-app.use(cors({ origin: "*" }));
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+// ✅ VERY IMPORTANT FOR AZURE
+const PORT = process.env.PORT || 5000;
 
+app.use(cors());
+app.use(express.json());
+
+// ✅ multer setup
 const upload = multer();
 
-// ✅ Azure Client
+// ✅ Azure client
 const client = new DocumentAnalysisClient(
   process.env.AZURE_ENDPOINT,
   new AzureKeyCredential(process.env.AZURE_KEY)
 );
 
-// ✅ ROOT ROUTE (for testing deployment)
+// 🔥 Health check route (IMPORTANT)
 app.get("/", (req, res) => {
-  res.send("Backend is running 🚀");
+  res.send("🚀 API is running successfully!");
 });
 
-// 🔥 Extract only important insights
+// 🔥 Extract key points
 function extractKeyPoints(text) {
   const points = [];
 
@@ -37,23 +39,15 @@ function extractKeyPoints(text) {
   const total = text.match(/TOTAL DUE\s*\$?([\d.]+)/i)?.[1];
   const customerMatch = text.match(/CUSTOMER NAME:\s*(.*)/i);
 
-  if (invoice) points.push(`Invoice Number: ${invoice}`);
-  if (date) points.push(`Invoice Date: ${date}`);
-  if (customerMatch) points.push(`Customer: ${customerMatch[1]}`);
-  if (total) points.push(`Total Amount: $${total}`);
-
-  // fallback important lines
-  const lines = text
-    .split("\n")
-    .filter((l) => l.trim().length > 15)
-    .slice(0, 2);
-
-  points.push(...lines);
+  if (invoice) points.push(`📄 Invoice Number: ${invoice}`);
+  if (date) points.push(`📅 Date: ${date}`);
+  if (customerMatch) points.push(`👤 Customer: ${customerMatch[1]}`);
+  if (total) points.push(`💰 Total: $${total}`);
 
   return points;
 }
 
-// ✅ MAIN API
+// 🔥 MAIN API
 app.post("/upload", upload.single("file"), async (req, res) => {
   try {
     if (!req.file) {
@@ -79,21 +73,18 @@ app.post("/upload", upload.single("file"), async (req, res) => {
 
     const keyPoints = extractKeyPoints(text);
 
-    // ✅ ONLY IMPORTANT POINTS
-    res.json({
+    return res.json({
       success: true,
       points: keyPoints,
     });
 
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: "Processing failed" });
+    console.error("ERROR:", error);
+    return res.status(500).json({ error: "Processing failed" });
   }
 });
 
-// ✅ IMPORTANT FOR AZURE
-const PORT = process.env.PORT || 5000;
-
+// ✅ START SERVER
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
