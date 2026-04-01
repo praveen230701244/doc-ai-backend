@@ -9,14 +9,24 @@ const {
 } = require("@azure/ai-form-recognizer");
 
 const app = express();
+
+// ✅ IMPORTANT (Azure fix)
 app.use(cors({ origin: "*" }));
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 const upload = multer();
 
+// ✅ Azure Client
 const client = new DocumentAnalysisClient(
   process.env.AZURE_ENDPOINT,
   new AzureKeyCredential(process.env.AZURE_KEY)
 );
+
+// ✅ ROOT ROUTE (for testing deployment)
+app.get("/", (req, res) => {
+  res.send("Backend is running 🚀");
+});
 
 // 🔥 Extract only important insights
 function extractKeyPoints(text) {
@@ -32,7 +42,7 @@ function extractKeyPoints(text) {
   if (customerMatch) points.push(`Customer: ${customerMatch[1]}`);
   if (total) points.push(`Total Amount: $${total}`);
 
-  // fallback important lines (clean)
+  // fallback important lines
   const lines = text
     .split("\n")
     .filter((l) => l.trim().length > 15)
@@ -42,11 +52,14 @@ function extractKeyPoints(text) {
 
   return points;
 }
-app.get("/", (req, res) => {
-  res.send("Backend is running 🚀");
-});
+
+// ✅ MAIN API
 app.post("/upload", upload.single("file"), async (req, res) => {
   try {
+    if (!req.file) {
+      return res.status(400).json({ error: "No file uploaded" });
+    }
+
     const fileBuffer = req.file.buffer;
 
     const poller = await client.beginAnalyzeDocument(
@@ -66,19 +79,21 @@ app.post("/upload", upload.single("file"), async (req, res) => {
 
     const keyPoints = extractKeyPoints(text);
 
-    // ✅ ONLY bullet points returned
-    return res.json({
+    // ✅ ONLY IMPORTANT POINTS
+    res.json({
+      success: true,
       points: keyPoints,
     });
 
   } catch (error) {
     console.error(error);
-    return res.status(500).json({ error: "Processing failed" });
+    res.status(500).json({ error: "Processing failed" });
   }
 });
 
+// ✅ IMPORTANT FOR AZURE
 const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, () => {
-  console.log("Server running on port " + PORT);
+  console.log(`Server running on port ${PORT}`);
 });
