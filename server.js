@@ -42,7 +42,9 @@ function extractKeyPoints(text) {
 
   return points;
 }
-
+app.get("/", (req, res) => {
+  res.send("Backend is running 🚀");
+});
 app.post("/upload", upload.single("file"), async (req, res) => {
   try {
     const fileBuffer = req.file.buffer;
